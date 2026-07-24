@@ -1,6 +1,6 @@
 script_name('CC Market History')
 script_description('Istoriya realnyh sdelok na rynke, neskolko serverov')
-script_version('4.1')
+script_version('4.2')
 
 local ffi = require('ffi')
 local imgui = require('mimgui')
@@ -1941,8 +1941,12 @@ end
 
 --=========================================================
 -- [trade] min shop price (sellMin) for items in the trade window
--- Reads Arizona inventory CEF events (packet 220) and shows a small
--- overlay near the cursor with each tracked server's cheapest listing.
+-- Reads Arizona inventory CEF events (packet 220):
+--   event.inventory.setTradeVisible [true]   -> trade opened
+--   event.setActiveView [ null ]             -> view closed (trade closed)
+--   event.inventory.playerInventory action:2 -> per-slot item update
+--     data.type 1 = own inventory, 4 = you give, 17 = you receive
+-- Shows a fixed overlay with each tracked server's cheapest listing.
 -- Debug capture: /cctdbg  ->  config/cc_trade_debug.log
 --=========================================================
 do
@@ -1951,7 +1955,7 @@ do
     local TRADE_FLAGS = 1 + 2 + 4 + 8 + 32 + 64 + 256 + 512 + 8192 + 196608
 
     local tradeOpen = false
-    local tradeGrids = {}   -- inventory type -> array of { id=string, ench=number }
+    local tradeGrids = {}   -- inventory type -> { slot -> { id=string, ench=number } }
 
     local tradeDbg = false
     local dbgPath = getWorkingDirectory() .. '/config/cc_trade_debug.log'
@@ -1990,36 +1994,39 @@ do
         return name, arg
     end
 
-    local function parseGrid(items)
-        local out = {}
-        if type(items) ~= 'table' then return out end
-        for i = 1, #items do
-            local it = items[i]
-            if type(it) == 'table' and it.item then
-                local id = tostring(it.item):match('(%d+)')
-                if id then
-                    out[#out + 1] = { id = id, ench = tonumber(it.enchant) or 0 }
-                end
-            end
-        end
-        return out
-    end
-
     local function handleEvent(name, arg)
-        if name == 'event.inventory.setTradeVisible' then
-            tradeOpen = (arg ~= nil) and (arg:find('true') ~= nil)
-            if not tradeOpen then tradeGrids = {} end
+        if name == 'event.setActiveView' then
+            -- null view => the inventory/trade window was closed
+            if arg and arg:find('null', 1, true) then
+                tradeOpen = false
+                tradeGrids = {}
+            end
+        elseif name == 'event.inventory.setTradeVisible' then
+            tradeOpen = (arg ~= nil) and (arg:find('true', 1, true) ~= nil)
+            tradeGrids = {}
         elseif name == 'event.inventory.playerInventory' and tradeOpen and arg then
             local ok, data = pcall(decodeJson, arg)
             if not ok or type(data) ~= 'table' then return end
             for i = 1, #data do
                 local e = data[i]
                 if type(e) == 'table' and tonumber(e.action) == 2
-                    and type(e.data) == 'table' and e.data.items then
+                    and type(e.data) == 'table' and type(e.data.items) == 'table' then
                     local ty = tonumber(e.data.type)
-                    -- type 1 is the player's own inventory panel; others are trade sides
+                    -- type 1 is the player's own inventory panel; 4 = give, 17 = receive
                     if ty and ty ~= 1 then
-                        tradeGrids[ty] = parseGrid(e.data.items)
+                        local grid = tradeGrids[ty]
+                        if not grid then grid = {}; tradeGrids[ty] = grid end
+                        local items = e.data.items
+                        for j = 1, #items do
+                            local it = items[j]
+                            if type(it) == 'table' and it.item then
+                                local id = tostring(it.item):match('(%d+)')
+                                local slot = tonumber(it.slot) or (j - 1)
+                                if id then
+                                    grid[slot] = { id = id, ench = tonumber(it.enchant) or 0 }
+                                end
+                            end
+                        end
                     end
                 end
             end
@@ -2031,7 +2038,8 @@ do
         local ok, text = pcall(cefText, bs)
         if not ok or not text or text == '' then return end
         if tradeDbg then dlog('RECV', text) end
-        if text:find('event.inventory.', 1, true) then
+        if text:find('event.inventory.', 1, true)
+            or text:find('event.setActiveView', 1, true) then
             local name, arg = splitEvent(text)
             if name then pcall(handleEvent, name, arg) end
         end
@@ -2043,12 +2051,25 @@ do
         if ok and text and text ~= '' then dlog('SEND', text) end
     end)
 
+    -- collect every item across both trade sides, ordered by type then slot
     local function tradeItems()
         local list = {}
-        for _, grid in pairs(tradeGrids) do
-            for _, it in ipairs(grid) do list[#list + 1] = it end
+        for ty, grid in pairs(tradeGrids) do
+            for slot, it in pairs(grid) do
+                list[#list + 1] = { id = it.id, ench = it.ench, ty = ty, slot = slot }
+            end
         end
+        table.sort(list, function(a, b)
+            if a.ty ~= b.ty then return a.ty < b.ty end
+            return a.slot < b.slot
+        end)
         return list
+    end
+
+    local function srvLabel(n)
+        if n == 32 then return 'Space' end
+        if n == 201 then return 'Vice City' end
+        return serverName(n)
     end
 
     imgui.OnFrame(
@@ -2069,7 +2090,7 @@ do
                 for _, srv in ipairs(tracked) do
                     local st = srvState[srv]
                     local best = st and st.currentBest and st.currentBest[key]
-                    imgui.Text((srv == 32 and 'Space' or srv == 201 and 'Vice City' or serverName(srv)) .. ':')
+                    imgui.Text(srvLabel(srv) .. ':')
                     imgui.SameLine(140)
                     if best and best.sellMin then
                         imgui.Text(formatMoney(best.sellMin) .. ' ' .. currencyOf(srv))
