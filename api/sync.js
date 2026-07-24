@@ -1,6 +1,11 @@
 import { Redis } from '@upstash/redis';
 
-const redis = Redis.fromEnv();
+// Vercel-интеграция Upstash кладёт переменные с префиксом KV_,
+// fromEnv() ждёт UPSTASH_REDIS_REST_* — поддерживаем оба набора
+const redis = new Redis({
+  url: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN
+});
 
 const LEASE_TTL = 300;              // аренда роли сборщика, сек
 const MAX_TRADES = 200000;          // сколько сделок держим на сервер
