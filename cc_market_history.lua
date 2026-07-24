@@ -1,6 +1,6 @@
 script_name('CC Market History')
 script_description('Istoriya realnyh sdelok na rynke, neskolko serverov')
-script_version('3.6')
+script_version('3.7')
 
 local ffi = require('ffi')
 local imgui = require('mimgui')
@@ -1215,7 +1215,7 @@ local function rebuildResaleRows()
                 local margin = dstBase - srcBase
                 if margin > 0 then
                     out[#out + 1] = {
-                        id = g.id, ench = g.ench, name = g.name,
+                        key = g.id .. '#' .. g.ench, id = g.id, ench = g.ench, name = g.name,
                         srcSrv = srcSrv, srcPrice = srcStats.median, srcCur = currencyOf(srcSrv),
                         dstSrv = dstSrv, dstPrice = dstStats.median, dstCur = currencyOf(dstSrv),
                         marginBase = margin,
