@@ -1,6 +1,6 @@
 script_name('CC Market History')
 script_description('Istoriya realnyh sdelok na rynke, neskolko serverov')
-script_version('3.5')
+script_version('3.6')
 
 local ffi = require('ffi')
 local imgui = require('mimgui')
@@ -24,6 +24,7 @@ local cfgData = inicfg.load({
         periodFilter = 0,
         sortMode = 0,
         minTrades = 0,
+        resale = 0,
         serverFilter = 0   -- 0 = все серверы
     },
     window = { sizeX = 1360, sizeY = 620, posX = 0.5, posY = 0.5 },
@@ -70,6 +71,7 @@ local sideFilter   = toNum(cfgData.main.sideFilter, 1)
 local periodFilter = toNum(cfgData.main.periodFilter, 0)
 local sortMode     = toNum(cfgData.main.sortMode, 0)
 local serverFilter = toNum(cfgData.main.serverFilter, 0)
+local resaleMode   = toNum(cfgData.main.resale, 0) ~= 0
 
 local syncEnabled = toBool(cfgData.sync.enabled, false)
 local syncUrl     = tostring(cfgData.sync.url or '')
@@ -110,6 +112,15 @@ end
 
 local function rateOf(srv)
     return currencyRates[tonumber(srv) or 0]
+end
+
+-- price -> base currency (currencyDefault). second return is
+-- true only when comparable: same currency, or a known VC rate.
+local function toBase(price, srv)
+    if currencyOf(srv) == currencyDefault then return price, true end
+    local r = rateOf(srv)
+    if r then return price * r, true end
+    return price, false
 end
 
 local cfgDirty, cfgDirtyAt = false, 0
@@ -180,6 +191,7 @@ local function saveCfg()
     cfgData.main.periodFilter = periodFilter
     cfgData.main.sortMode = sortMode
     cfgData.main.serverFilter = serverFilter
+    cfgData.main.resale = resaleMode and 1 or 0
     cfgData.window.sizeX = cfg.sizeX[0]
     cfgData.window.sizeY = cfg.sizeY[0]
     cfgData.window.posX = cfg.posX[0]
@@ -1134,6 +1146,106 @@ local function rebuildRows()
     rowsSort, rowsMin, rowsSrv = sortMode, cfg.minTrades[0], serverFilter
 end
 
+-- resale table: for every item, find where it is cheapest to buy
+-- (min sell-median in base currency) and where it sells highest
+-- (max buy-median in base currency) on a DIFFERENT server.
+local resaleCache = {}
+local resaleVersion = -1
+local resaleWarn = false
+local resaleQuery, resalePeriod, resaleSort, resaleMin = nil, -1, -1, -1
+
+local function rebuildResaleRows()
+    local query = lower(ffi.string(searchBuf))
+    if query == '' then query = nil end
+    if resaleVersion == dataVersion and resaleQuery == query
+        and resalePeriod == periodFilter and resaleSort == sortMode
+        and resaleMin == cfg.minTrades[0] then
+        return
+    end
+
+    -- group per item (id#ench) with each server's sell/buy stats
+    local groups = {}
+    for k in pairs(byKey) do
+        local srv, id, ench, side = k:match('^(%d+)#(%d+)#(%d+)#(%a+)$')
+        if srv then
+            local stats = statsCache[k]
+            if stats == nil then
+                stats = computeStats(k) or false
+                statsCache[k] = stats
+            end
+            if stats then
+                local gk = id .. '#' .. ench
+                local g = groups[gk]
+                if not g then g = { id = id, ench = tonumber(ench) or 0, name = stats.name, srv = {} }; groups[gk] = g end
+                if stats.name and stats.name ~= '' then g.name = stats.name end
+                local sn = tonumber(srv)
+                local perc = g.srv[sn]
+                if not perc then perc = {}; g.srv[sn] = perc end
+                perc[side] = stats
+            end
+        end
+    end
+
+    local minT = cfg.minTrades[0]
+    local warn = false
+    local out = {}
+    for _, g in pairs(groups) do
+        if not query or lower(g.name):find(query, 1, true) then
+            local srcSrv, srcStats, srcBase
+            local dstSrv, dstStats, dstBase
+            for sn, sides in pairs(g.srv) do
+                local sell = sides.sell
+                if sell and (minT <= 0 or sell.count >= minT) then
+                    local base, ok = toBase(sell.median, sn)
+                    if not ok then warn = true end
+                    if ok and (not srcBase or base < srcBase) then
+                        srcBase, srcSrv, srcStats = base, sn, sell
+                    end
+                end
+                local buy = sides.buy
+                if buy and (minT <= 0 or buy.count >= minT) then
+                    local base, ok = toBase(buy.median, sn)
+                    if not ok then warn = true end
+                    if ok and (not dstBase or base > dstBase) then
+                        dstBase, dstSrv, dstStats = base, sn, buy
+                    end
+                end
+            end
+            if srcSrv and dstSrv and srcSrv ~= dstSrv then
+                local margin = dstBase - srcBase
+                if margin > 0 then
+                    out[#out + 1] = {
+                        id = g.id, ench = g.ench, name = g.name,
+                        srcSrv = srcSrv, srcPrice = srcStats.median, srcCur = currencyOf(srcSrv),
+                        dstSrv = dstSrv, dstPrice = dstStats.median, dstCur = currencyOf(dstSrv),
+                        marginBase = margin,
+                        marginPct = (srcBase > 0) and (margin / srcBase * 100) or 0,
+                        count = math.min(srcStats.count, dstStats.count),
+                        srcKey = keyOf(srcSrv, g.id, g.ench, 'sell'),
+                        dstKey = keyOf(dstSrv, g.id, g.ench, 'buy')
+                    }
+                end
+            end
+        end
+    end
+
+    local cmp
+    if sortMode == 2 then
+        cmp = function(a, b) return lower(a.name) < lower(b.name) end
+    elseif sortMode == 1 then
+        cmp = function(a, b) return a.count > b.count end
+    else
+        cmp = function(a, b) return a.marginBase > b.marginBase end
+    end
+    table.sort(out, cmp)
+
+    resaleCache = out
+    resaleWarn = warn
+    resaleVersion = dataVersion
+    resaleQuery, resalePeriod = query, periodFilter
+    resaleSort, resaleMin = sortMode, cfg.minTrades[0]
+end
+
 local function invalidateStats()
     for k in pairs(statsCache) do statsCache[k] = nil end
     dataVersion = dataVersion + 1
@@ -1322,6 +1434,108 @@ local function detailPanel(stats)
     end
 end
 
+-- resale table column X positions
+local RC_NAME, RC_BUY, RC_BUYP, RC_SELL, RC_SELLP, RC_MARGIN, RC_PCT, RC_CNT =
+      10, 250, 350, 470, 570, 700, 810, 875
+
+local function resaleLadder(key)
+    local list = byKey[key]
+    if not list then colored(GREY, '-'); return end
+    local cutoff = periodCutoff()
+    local shown = 0
+    for i = #list, 1, -1 do
+        local t = list[i]
+        if t.ts >= cutoff then
+            shown = shown + 1
+            if shown > 12 then break end
+            imgui.Text(os.date('%d.%m %H:%M', t.ts))
+            imgui.SameLine(85)
+            imgui.PushStyleColor(imgui.Col.Text, t.exact and WHITE or ORANGE)
+            imgui.Text(formatMoney(t.price))
+            imgui.PopStyleColor()
+            imgui.SameLine(190)
+            colored(GREY, 'x' .. t.qty)
+        end
+    end
+    if shown == 0 then colored(GREY, '-') end
+end
+
+local function resaleDetailPanel(row)
+    imgui.TextWrapped(row.name)
+    colored(GREY, 'ID ' .. row.id)
+    imgui.Separator()
+
+    imgui.Text(u8('\xCA\xF3\xEF\xE8\xF2\xFC\x20\xED\xE0\x20') .. serverName(row.srcSrv))
+    colored(WHITE, formatMoney(row.srcPrice) .. ' ' .. row.srcCur)
+    imgui.Text(u8('\xCF\xF0\xEE\xE4\xE0\xF2\xFC\x20\xED\xE0\x20') .. serverName(row.dstSrv))
+    colored(WHITE, formatMoney(row.dstPrice) .. ' ' .. row.dstCur)
+
+    imgui.Separator()
+    imgui.Text(u8('\xCC\xE0\xF0\xE6\xE0\x3A\x20') .. formatMoney(math.floor(row.marginBase)) .. ' ' .. currencyDefault)
+    colored(GREEN, u8('\xCD\xE0\xE2\xE0\xF0\x20') .. string.format('%.0f%%', row.marginPct))
+
+    imgui.Separator()
+    colored(GREY, u8('\xD6\xE5\xED\xFB\x20\xEF\xEE\xEA\xF3\xEF\xEA\xE8\x20\x28\xE8\xF1\xF2\xEE\xF7\xED\xE8\xEA\x29'))
+    resaleLadder(row.srcKey)
+    imgui.Separator()
+    colored(GREY, u8('\xD6\xE5\xED\xFB\x20\xEF\xF0\xEE\xE4\xE0\xE6\xE8\x20\x28\xEF\xF0\xE8\xB8\xEC\xED\xE8\xEA\x29'))
+    resaleLadder(row.dstKey)
+end
+
+local function renderResaleTable(tableW, tableH)
+    imgui.BeginChild('##table', imgui.ImVec2(tableW, tableH), true)
+
+    headerCell(RC_NAME, '\xCF\xF0\xE5\xE4\xEC\xE5\xF2', 2)
+    imgui.SameLine(); imgui.SetCursorPosX(RC_BUY);    colored(GREY, u8('\xCA\xF3\xEF\xE8\xF2\xFC'))
+    imgui.SameLine(); imgui.SetCursorPosX(RC_SELL);   colored(GREY, u8('\xCF\xF0\xEE\xE4\xE0\xF2\xFC'))
+    imgui.SameLine(); headerCell(RC_MARGIN, '\xCC\xE0\xF0\xE6\xE0\x20' .. currencyDefault, 3)
+    imgui.SameLine(); imgui.SetCursorPosX(RC_PCT);    colored(GREY, '%')
+    imgui.SameLine(); headerCell(RC_CNT, '\xD1\xE4\xE5\xEB\xEE\xEA', 1)
+    imgui.Separator()
+
+    for i = 1, #resaleCache do
+        local row = resaleCache[i]
+        local y = imgui.GetCursorPosY()
+
+        if imgui.Selectable('##rr' .. row.key, selectedKey == row.key) then
+            selectedKey = row.key
+        end
+        imgui.SetCursorPosY(y)
+
+        imgui.SetCursorPosX(RC_NAME)
+        imgui.Text(fitText(row.name, RC_BUY - RC_NAME - 15, 'rn' .. row.name))
+        if imgui.IsItemHovered() then
+            imgui.BeginTooltip(); imgui.Text(row.name); imgui.EndTooltip()
+        end
+
+        imgui.SetCursorPosY(y); imgui.SetCursorPosX(RC_BUY)
+        colored(GREY, fitText(serverName(row.srcSrv), 95, 'rb' .. row.srcSrv))
+        imgui.SetCursorPosY(y); imgui.SetCursorPosX(RC_BUYP)
+        colored(WHITE, formatMoney(row.srcPrice) .. ' ' .. row.srcCur)
+
+        imgui.SetCursorPosY(y); imgui.SetCursorPosX(RC_SELL)
+        colored(GREY, fitText(serverName(row.dstSrv), 95, 'rs' .. row.dstSrv))
+        imgui.SetCursorPosY(y); imgui.SetCursorPosX(RC_SELLP)
+        colored(WHITE, formatMoney(row.dstPrice) .. ' ' .. row.dstCur)
+
+        imgui.SetCursorPosY(y); imgui.SetCursorPosX(RC_MARGIN)
+        colored(GREEN, formatMoney(math.floor(row.marginBase)))
+
+        imgui.SetCursorPosY(y); imgui.SetCursorPosX(RC_PCT)
+        colored(CYAN, string.format('%.0f%%', row.marginPct))
+
+        imgui.SetCursorPosY(y); imgui.SetCursorPosX(RC_CNT)
+        colored(GREY, tostring(row.count))
+    end
+
+    if #resaleCache == 0 then
+        colored(GREY, u8('\xCD\xE5\xF2\x20\xE2\xFB\xE3\xEE\xE4\xED\xFB\xF5\x20\xEF\xE5\xF0\xE5\xEF\xF0\xEE\xE4\xE0\xE6\x2E'))
+        colored(GREY, u8('\xCD\xF3\xE6\xED\xEE\x20\xE1\xEE\xEB\xFC\xF8\xE5\x20\xF1\xE4\xE5\xEB\xEE\xEA\x20\xEF\xEE\x20\xEE\xE1\xEE\xE8\xEC\x20\xF1\xE5\xF0\xE2\xE5\xF0\xE0\xEC\x2C'))
+        colored(GREY, u8('\xE8\xEB\xE8\x20\xED\xE5\x20\xE7\xE0\xE4\xE0\xED\x20\xEA\xF3\xF0\xF1\x20\x56\x43\x24\x20\x28\x72\x61\x74\x65\x73\x3D\x32\x30\x31\x29\x2E'))
+    end
+    imgui.EndChild()
+end
+
 imgui.OnFrame(
     function() return windowOpen[0] end,
     function(this)
@@ -1435,10 +1649,25 @@ imgui.OnFrame(
             for _, n in ipairs(tracked) do srvState[n].lastUpdate = 0 end
         end
 
+        imgui.SameLine(0, 18)
+        do
+            local active = resaleMode
+            if active then imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.30, 0.45, 0.65, 1.00)) end
+            if imgui.Button(u8('\xCF\xE5\xF0\xE5\xEF\xF0\xEE\xE4\xE0\xE6\xE8') .. '##resale') then
+                resaleMode = not resaleMode; rowsVersion = -1; resaleVersion = -1; markDirty()
+            end
+            if active then imgui.PopStyleColor() end
+            if imgui.IsItemHovered() then
+                imgui.BeginTooltip()
+                imgui.Text(u8('\xD2\xE0\xE1\xEB\xE8\xF6\xE0\x20\xEF\xE5\xF0\xE5\xEF\xF0\xEE\xE4\xE0\xE6\x20\xEC\xE5\xE6\xE4\xF3\x20\xF1\xE5\xF0\xE2\xE5\xF0\xE0\xEC\xE8'))
+                imgui.EndTooltip()
+            end
+        end
+
         -- статус
-        rebuildRows()
+        if resaleMode then rebuildResaleRows() else rebuildRows() end
         local status = ('позиций: %d  |  сделок: %d  |  срезов: %d  |  сортировка: ')
-            :format(#rowsCache, #trades, totalSnapshots)
+            :format(resaleMode and #resaleCache or #rowsCache, #trades, totalSnapshots)
         colored(GREY, u8(status) .. (sortNames[sortMode] or ''))
         imgui.SameLine()
         if updating then
@@ -1475,7 +1704,10 @@ imgui.OnFrame(
         imgui.Separator()
 
         -- цены в разных валютах в одном списке напрямую не сравниваются
-        if serverFilter == 0 then
+        if resaleMode and resaleWarn then
+            colored(ORANGE, u8('\xCD\xE5\xF2\x20\xEA\xF3\xF0\xF1\xE0\x20\x56\x43\x24\x3A\x20\xE2\xEF\xE8\xF8\xE8\x20\x5B\x63\x75\x72\x72\x65\x6E\x63\x79\x5D\x20\x72\x61\x74\x65\x73\x3D\x32\x30\x31\x3A\xEA\xF3\xF0\xF1\x20\x97\x20\xE8\xED\xE0\xF7\xE5\x20\xEF\xE5\xF0\xE5\xEF\xF0\xEE\xE4\xE0\xE6\xE8\x20\xF1\x20\x56\x69\x63\x65\x20\x43\x69\x74\x79\x20\xED\xE5\x20\xE2\x20\xF1\xF7\xB8\xF2'))
+        end
+        if (not resaleMode) and serverFilter == 0 then
             local seen, mixed = nil, false
             for _, n in ipairs(tracked) do
                 local c = currencyOf(n)
@@ -1502,6 +1734,9 @@ imgui.OnFrame(
         end
         local tableH = sz.y - imgui.GetCursorPosY() - style.WindowPadding.y - 4
 
+        if resaleMode then
+            renderResaleTable(tableW, tableH)
+        else
         imgui.BeginChild('##table', imgui.ImVec2(tableW, tableH), true)
         COL_NAME = style.WindowPadding.x
         NAME_WIDTH = COL_SRV - COL_NAME - 15
@@ -1567,18 +1802,20 @@ imgui.OnFrame(
             colored(GREY, u8('дальше история будет копиться сама.'))
         end
         imgui.EndChild()
+        end
 
         if showDetail then
             imgui.SameLine()
             imgui.BeginChild('##detail', imgui.ImVec2(detailW, tableH), true)
+            local rows = resaleMode and resaleCache or rowsCache
             local sel = nil
             if selectedKey then
-                for i = 1, #rowsCache do
-                    if rowsCache[i].key == selectedKey then sel = rowsCache[i]; break end
+                for i = 1, #rows do
+                    if rows[i].key == selectedKey then sel = rows[i]; break end
                 end
             end
             if sel then
-                detailPanel(sel)
+                if resaleMode then resaleDetailPanel(sel) else detailPanel(sel) end
             else
                 colored(GREY, u8('Кликни по строке,'))
                 colored(GREY, u8('чтобы увидеть все'))
