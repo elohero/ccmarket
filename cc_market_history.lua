@@ -1938,3 +1938,63 @@ function main()
         end
     end
 end
+
+--=========================================================
+-- [trade] CEF event capture (temporary discovery logger)
+-- Toggle in-game with /cctdbg. Writes to config/cc_trade_debug.log
+-- Open a trade, drop an item, click it, then send me the log.
+--=========================================================
+do
+    local tradeDbg = false
+    local dbgPath = getWorkingDirectory() .. '\config\cc_trade_debug.log'
+
+    local function dlog(dir, text)
+        local f = io.open(dbgPath, 'a')
+        if not f then return end
+        f:write(('%s %s %s\n'):format(os.date('%H:%M:%S'), dir, text))
+        f:close()
+    end
+
+    -- decode a packet-220 CEF payload the same way the setToken reader does
+    local function cefText(bs)
+        local text
+        local saved = raknetBitStreamGetReadOffset(bs)
+        raknetBitStreamIgnoreBits(bs, 8)
+        if raknetBitStreamReadInt8(bs) == 17 then
+            raknetBitStreamIgnoreBits(bs, 32)
+            local len = raknetBitStreamReadInt16(bs)
+            local extra = raknetBitStreamReadInt8(bs)
+            if extra ~= 0 then
+                text = raknetBitStreamDecodeString(bs, len + extra)
+            else
+                text = raknetBitStreamReadString(bs, len)
+            end
+        end
+        raknetBitStreamSetReadOffset(bs, saved)
+        return text
+    end
+
+    addEventHandler('onReceivePacket', function(id, bs)
+        if not tradeDbg or id ~= 220 then return end
+        local ok, t = pcall(cefText, bs)
+        if ok and t and t ~= '' then dlog('RECV', t) end
+    end)
+
+    addEventHandler('onSendPacket', function(id, bs)
+        if not tradeDbg or id ~= 220 then return end
+        local ok, t = pcall(cefText, bs)
+        if ok and t and t ~= '' then dlog('SEND', t) end
+    end)
+
+    lua_thread.create(function()
+        while not isSampAvailable() do wait(0) end
+        sampRegisterChatCommand('cctdbg', function()
+            tradeDbg = not tradeDbg
+            if tradeDbg then
+                sampAddChatMessage('[CC] trade debug ON -> moonloader/config/cc_trade_debug.log', 0x66CCFF)
+            else
+                sampAddChatMessage('[CC] trade debug OFF', 0x66CCFF)
+            end
+        end)
+    end)
+end
