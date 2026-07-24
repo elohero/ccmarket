@@ -1,6 +1,6 @@
 script_name('CC Market History')
 script_description('Istoriya realnyh sdelok na rynke, neskolko serverov')
-script_version('4.5')
+script_version('4.6')
 
 local ffi = require('ffi')
 local imgui = require('mimgui')
@@ -1255,6 +1255,19 @@ local function invalidateStats()
     dataVersion = dataVersion + 1
 end
 
+local function removeServer(n)
+    n = tonumber(n)
+    if not n or not trackedSet[n] then return end
+    trackedSet[n] = nil
+    srvState[n] = nil
+    for i = #tracked, 1, -1 do
+        if tracked[i] == n then table.remove(tracked, i) end
+    end
+    if serverFilter == n then serverFilter = 0 end
+    rowsVersion = -1
+    markDirty()
+end
+
 --=========================================================
 -- КУРСОР
 --=========================================================
@@ -1614,6 +1627,7 @@ imgui.OnFrame(
             end
             if active then imgui.PopStyleColor() end
         end
+        local srvRemoveReq = nil
         for _, n in ipairs(tracked) do
             imgui.SameLine(0, 4)
             local active = (serverFilter == n)
@@ -1622,11 +1636,15 @@ imgui.OnFrame(
                 serverFilter = n; rowsVersion = -1; markDirty()
             end
             if active then imgui.PopStyleColor() end
+            if imgui.IsItemHovered() and imgui.IsMouseClicked(1) and imgui.GetIO().KeyCtrl then
+                srvRemoveReq = n
+            end
 
             if imgui.IsItemHovered() then
                 local st = srvState[n]
                 imgui.BeginTooltip()
                 imgui.Text(serverName(n) .. u8('  (номер ') .. n .. ')')
+                imgui.Text(u8('Ctrl+\xCF\xCA\xCC\x20\x2D\x20\xF3\xE4\xE0\xEB\xE8\xF2\xFC'))
                 imgui.Text(u8('валюта: ') .. currencyOf(n))
                 imgui.Text(u8('срезов: ') .. st.snapshots)
                 if st.lastOkTs then
@@ -1647,6 +1665,7 @@ imgui.OnFrame(
                 imgui.EndTooltip()
             end
         end
+        if srvRemoveReq then removeServer(srvRemoveReq) end
 
         imgui.SameLine(0, 18)
         if imgui.Button(u8('Обновить все')) then
