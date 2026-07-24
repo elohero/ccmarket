@@ -1,6 +1,6 @@
 script_name('CC Market History')
 script_description('Istoriya realnyh sdelok na rynke, neskolko serverov')
-script_version('4.3')
+script_version('4.4')
 
 local ffi = require('ffi')
 local imgui = require('mimgui')
@@ -86,6 +86,7 @@ end
 
 local syncActive = syncEnabled and syncUrl ~= ''
 local windowOpen = new.bool(false)
+        local autoFocusTrade = new.bool(toBool(cfgData.main.autoFocus, true))
 
 --=========================================================
 -- ¬¿Àﬁ“€
@@ -192,6 +193,7 @@ local function saveCfg()
     cfgData.main.sortMode = sortMode
     cfgData.main.serverFilter = serverFilter
     cfgData.main.resale = resaleMode and 1 or 0
+        cfgData.main.autoFocus = autoFocusTrade[0] and 1 or 0
     cfgData.window.sizeX = cfg.sizeX[0]
     cfgData.window.sizeY = cfg.sizeY[0]
     cfgData.window.posX = cfg.posX[0]
@@ -1663,6 +1665,7 @@ imgui.OnFrame(
                 imgui.EndTooltip()
             end
         end
+        imgui.SameLine(0, 18); if imgui.Checkbox('Auto-focus trade', autoFocusTrade) then markDirty() end
 
         -- ÒÚ‡ÚÛÒ
         if resaleMode then rebuildResaleRows() else rebuildRows() end
@@ -1969,6 +1972,7 @@ do
     ]])
     local gtaWnd = nil
     local function focusGame()
+        if not autoFocusTrade[0] then return end
         pcall(function()
             if gtaWnd == nil then
                 gtaWnd = ffi.C.FindWindowA('Grand theft auto San Andreas', nil)
