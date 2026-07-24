@@ -1,6 +1,6 @@
 script_name('CC Market History')
 script_description('Istoriya realnyh sdelok na rynke, neskolko serverov')
-script_version('4.0')
+script_version('4.1')
 
 local ffi = require('ffi')
 local imgui = require('mimgui')
@@ -2056,8 +2056,8 @@ do
         function()
             local items = tradeItems()
             if #items == 0 then return end
-            local mp = imgui.GetMousePos()
-            imgui.SetNextWindowPos(imgui.ImVec2(mp.x + 18, mp.y + 18), imgui.Cond.Always)
+            local resX, resY = getScreenResolution()
+            imgui.SetNextWindowPos(imgui.ImVec2(resX * 0.5, resY * 0.12), imgui.Cond.Always, imgui.ImVec2(0.5, 0))
             imgui.SetNextWindowBgAlpha(0.88)
             imgui.Begin('##cc_trade_price', nil, TRADE_FLAGS)
             for n = 1, #items do
@@ -2069,7 +2069,7 @@ do
                 for _, srv in ipairs(tracked) do
                     local st = srvState[srv]
                     local best = st and st.currentBest and st.currentBest[key]
-                    imgui.Text(serverName(srv) .. ':')
+                    imgui.Text((srv == 32 and 'Space' or srv == 201 and 'Vice City' or serverName(srv)) .. ':')
                     imgui.SameLine(140)
                     if best and best.sellMin then
                         imgui.Text(formatMoney(best.sellMin) .. ' ' .. currencyOf(srv))
