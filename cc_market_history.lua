@@ -1,6 +1,6 @@
 script_name('CC Market History')
 script_description('Istoriya realnyh sdelok na rynke, neskolko serverov')
-script_version('3.4')
+script_version('3.5')
 
 local ffi = require('ffi')
 local imgui = require('mimgui')
@@ -1659,7 +1659,7 @@ function main()
     loadTradesFromCsv()
     markDirty()
 
-    sampAddChatMessage(('[CC] сбор запущен, серверов: %d. Окно: /cc'):format(#tracked), 0x66CCFF)
+    sampAddChatMessage('[ValechkeMarket] Дима педик дырявый. Окно: /cc', 0x66CCFF)
 
     local VK_ESCAPE = 0x1B
     local escWasDown = false
