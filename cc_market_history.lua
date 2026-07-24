@@ -1,6 +1,6 @@
 script_name('CC Market History')
 script_description('Istoriya realnyh sdelok na rynke, neskolko serverov')
-script_version('3.9')
+script_version('4.0')
 
 local ffi = require('ffi')
 local imgui = require('mimgui')
@@ -1940,22 +1940,29 @@ function main()
 end
 
 --=========================================================
--- [trade] CEF event capture (temporary discovery logger)
--- Toggle in-game with /cctdbg. Writes to config/cc_trade_debug.log
--- Open a trade, drop an item, click it, then send me the log.
+-- [trade] min shop price (sellMin) for items in the trade window
+-- Reads Arizona inventory CEF events (packet 220) and shows a small
+-- overlay near the cursor with each tracked server's cheapest listing.
+-- Debug capture: /cctdbg  ->  config/cc_trade_debug.log
 --=========================================================
 do
-    local tradeDbg = false
-    local dbgPath = getWorkingDirectory() .. "/config/cc_trade_debug.log"
+    -- NoTitleBar+NoResize+NoMove+NoScrollbar+NoCollapse+AlwaysAutoResize
+    -- +NoSavedSettings+NoMouseInputs+NoFocusOnAppearing+NoNav (stable ImGui bits)
+    local TRADE_FLAGS = 1 + 2 + 4 + 8 + 32 + 64 + 256 + 512 + 8192 + 196608
 
+    local tradeOpen = false
+    local tradeGrids = {}   -- inventory type -> array of { id=string, ench=number }
+
+    local tradeDbg = false
+    local dbgPath = getWorkingDirectory() .. '/config/cc_trade_debug.log'
     local function dlog(dir, text)
         local f = io.open(dbgPath, 'a')
         if not f then return end
-        f:write(('%s %s %s\n'):format(os.date('%H:%M:%S'), dir, text))
+        f:write(os.date('%H:%M:%S ') .. dir .. ' ' .. text .. string.char(10))
         f:close()
     end
 
-    -- decode a packet-220 CEF payload the same way the setToken reader does
+    -- decode a packet-220 CEF payload (same frame as the setToken reader)
     local function cefText(bs)
         local text
         local saved = raknetBitStreamGetReadOffset(bs)
@@ -1974,24 +1981,113 @@ do
         return text
     end
 
+    -- window.executeEvent('name', `<json>`);  ->  name, json
+    local function splitEvent(text)
+        local name = text:match("executeEvent%('([^']+)'")
+        if not name then return nil end
+        local arg = text:match("executeEvent%('[^']+'%s*,%s*(.-)%s*%)%s*;?%s*$")
+        if arg then arg = arg:gsub("^[`']", ''):gsub("[`']$", '') end
+        return name, arg
+    end
+
+    local function parseGrid(items)
+        local out = {}
+        if type(items) ~= 'table' then return out end
+        for i = 1, #items do
+            local it = items[i]
+            if type(it) == 'table' and it.item then
+                local id = tostring(it.item):match('(%d+)')
+                if id then
+                    out[#out + 1] = { id = id, ench = tonumber(it.enchant) or 0 }
+                end
+            end
+        end
+        return out
+    end
+
+    local function handleEvent(name, arg)
+        if name == 'event.inventory.setTradeVisible' then
+            tradeOpen = (arg ~= nil) and (arg:find('true') ~= nil)
+            if not tradeOpen then tradeGrids = {} end
+        elseif name == 'event.inventory.playerInventory' and tradeOpen and arg then
+            local ok, data = pcall(decodeJson, arg)
+            if not ok or type(data) ~= 'table' then return end
+            for i = 1, #data do
+                local e = data[i]
+                if type(e) == 'table' and tonumber(e.action) == 2
+                    and type(e.data) == 'table' and e.data.items then
+                    local ty = tonumber(e.data.type)
+                    -- type 1 is the player's own inventory panel; others are trade sides
+                    if ty and ty ~= 1 then
+                        tradeGrids[ty] = parseGrid(e.data.items)
+                    end
+                end
+            end
+        end
+    end
+
     addEventHandler('onReceivePacket', function(id, bs)
-        if not tradeDbg or id ~= 220 then return end
-        local ok, t = pcall(cefText, bs)
-        if ok and t and t ~= '' then dlog('RECV', t) end
+        if id ~= 220 then return end
+        local ok, text = pcall(cefText, bs)
+        if not ok or not text or text == '' then return end
+        if tradeDbg then dlog('RECV', text) end
+        if text:find('event.inventory.', 1, true) then
+            local name, arg = splitEvent(text)
+            if name then pcall(handleEvent, name, arg) end
+        end
     end)
 
     addEventHandler('onSendPacket', function(id, bs)
         if not tradeDbg or id ~= 220 then return end
-        local ok, t = pcall(cefText, bs)
-        if ok and t and t ~= '' then dlog('SEND', t) end
+        local ok, text = pcall(cefText, bs)
+        if ok and text and text ~= '' then dlog('SEND', text) end
     end)
+
+    local function tradeItems()
+        local list = {}
+        for _, grid in pairs(tradeGrids) do
+            for _, it in ipairs(grid) do list[#list + 1] = it end
+        end
+        return list
+    end
+
+    imgui.OnFrame(
+        function() return tradeOpen end,
+        function()
+            local items = tradeItems()
+            if #items == 0 then return end
+            local mp = imgui.GetMousePos()
+            imgui.SetNextWindowPos(imgui.ImVec2(mp.x + 18, mp.y + 18), imgui.Cond.Always)
+            imgui.SetNextWindowBgAlpha(0.88)
+            imgui.Begin('##cc_trade_price', nil, TRADE_FLAGS)
+            for n = 1, #items do
+                local it = items[n]
+                local key = it.id .. '#' .. it.ench
+                local nm = itemNameById(it.id)
+                if it.ench and it.ench > 0 then nm = nm .. ' +' .. it.ench end
+                colored(CYAN, nm)
+                for _, srv in ipairs(tracked) do
+                    local st = srvState[srv]
+                    local best = st and st.currentBest and st.currentBest[key]
+                    imgui.Text(serverName(srv) .. ':')
+                    imgui.SameLine(140)
+                    if best and best.sellMin then
+                        imgui.Text(formatMoney(best.sellMin) .. ' ' .. currencyOf(srv))
+                    else
+                        colored(GREY, '-')
+                    end
+                end
+                if n < #items then imgui.Separator() end
+            end
+            imgui.End()
+        end)
 
     lua_thread.create(function()
         while not isSampAvailable() do wait(0) end
         sampRegisterChatCommand('cctdbg', function()
             tradeDbg = not tradeDbg
             if tradeDbg then
-                sampAddChatMessage('[CC] trade debug ON -> moonloader/config/cc_trade_debug.log', 0x66CCFF)
+                sampAddChatMessage('[CC] trade debug ON -> config/cc_trade_debug.log', 0x66CCFF)
             else
                 sampAddChatMessage('[CC] trade debug OFF', 0x66CCFF)
             end
