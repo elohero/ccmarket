@@ -1,6 +1,6 @@
 script_name('CC Market History')
 script_description('Istoriya realnyh sdelok na rynke, neskolko serverov')
-script_version('3.2')
+script_version('3.3')
 
 local ffi = require('ffi')
 local imgui = require('mimgui')
@@ -1142,7 +1142,7 @@ end
 --=========================================================
 -- йспянп
 --=========================================================
-local CURSOR_MODE = 3
+local CURSOR_MODE = 1
 local cursorActive = false
 local cursorMode = nil
 local cursorNextRefresh = 0
