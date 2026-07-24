@@ -1,6 +1,6 @@
 script_name('CC Market History')
 script_description('Istoriya realnyh sdelok na rynke, neskolko serverov')
-script_version('3.0')
+script_version('3.1')
 
 local ffi = require('ffi')
 local imgui = require('mimgui')
@@ -12,19 +12,19 @@ local u8 = encoding.UTF8
 local new = imgui.new
 
 --=========================================================
--- НАСТРОЙКИ
+-- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 --=========================================================
 local cfgFile = 'cc_market.ini'
 local cfgData = inicfg.load({
     main = {
         refreshSec = 60,
         keepDays = 14,
-        servers = '',      -- доп. серверы через запятую, напр. 201 (Vice City)
+        servers = '',      -- пїЅпїЅпїЅ. пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ. 201 (Vice City)
         sideFilter = 1,
         periodFilter = 0,
         sortMode = 0,
         minTrades = 0,
-        serverFilter = 0   -- 0 = все серверы
+        serverFilter = 0   -- 0 = пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
     },
     window = { sizeX = 1360, sizeY = 620, posX = 0.5, posY = 0.5 },
     sync = {
@@ -36,8 +36,8 @@ local cfgData = inicfg.load({
     },
     currency = {
         default = 'SA$',
-        map = '201:VC$',   -- 'номер:код' через запятую
-        rates = ''         -- 'номер:курс', сколько единиц валюты по умолчанию за 1 местную
+        map = '201:VC$',   -- 'пїЅпїЅпїЅпїЅпїЅ:пїЅпїЅпїЅ' пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+        rates = ''         -- 'пїЅпїЅпїЅпїЅпїЅ:пїЅпїЅпїЅпїЅ', пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ 1 пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
     }
 }, cfgFile)
 
@@ -86,9 +86,9 @@ local syncActive = syncEnabled and syncUrl ~= ''
 local windowOpen = new.bool(false)
 
 --=========================================================
--- ВАЛЮТЫ
--- На Vice City ходит VC$, на остальных SA$. Цены разных
--- серверов между собой напрямую несопоставимы.
+-- пїЅпїЅпїЅпїЅпїЅпїЅ
+-- пїЅпїЅ Vice City пїЅпїЅпїЅпїЅпїЅ VC$, пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ SA$. пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
+-- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.
 --=========================================================
 local currencyDefault = tostring(cfgData.currency.default or 'SA$')
 local currencyMap = {}
@@ -119,11 +119,11 @@ local function markDirty()
 end
 
 --=========================================================
--- СПИСОК ОТСЛЕЖИВАЕМЫХ СЕРВЕРОВ
+-- пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 --=========================================================
-local tracked = {}        -- массив номеров
+local tracked = {}        -- пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 local trackedSet = {}
-local srvState = {}       -- номер -> состояние сбора
+local srvState = {}       -- пїЅпїЅпїЅпїЅпїЅ -> пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
 
 local function newServerState()
     return {
@@ -150,7 +150,7 @@ for part in tostring(cfgData.main.servers or ''):gmatch('[^,%s]+') do
     addServer(part)
 end
 
--- lastIds из конфига: '32:1200,201:340'
+-- lastIds пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ: '32:1200,201:340'
 for pair in tostring(cfgData.sync.lastIds or ''):gmatch('[^,%s]+') do
     local srv, sid = pair:match('^(%d+):(%d+)$')
     if srv then
@@ -191,7 +191,7 @@ local function saveCfg()
 end
 
 --=========================================================
--- АВТОРИЗАЦИЯ
+-- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 --=========================================================
 local authFile = 'cc_market_auth.ini'
 local authData = inicfg.load({
@@ -310,8 +310,41 @@ local function asyncHttp(method, url, args, resolve, reject)
     return lua_thread.create(httpThread, thread, resolve, reject)
 end
 
+-- ==== auto-update ====
+local UPDATE_RAW_URL = 'https://raw.githubusercontent.com/elohero/ccmarket/main/cc_market_history.lua'
+
+local function parseVer(s)
+    local t = {}
+    for n in tostring(s):gmatch('%d+') do t[#t + 1] = tonumber(n) end
+    return t
+end
+
+local function verNewer(remote, cur)
+    local a, b = parseVer(remote), parseVer(cur)
+    for i = 1, math.max(#a, #b) do
+        local x, y = a[i] or 0, b[i] or 0
+        if x ~= y then return x > y end
+    end
+    return false
+end
+
+local function checkUpdate()
+    asyncHttp('GET', UPDATE_RAW_URL, {}, function(r)
+        if not r or not r.text or #r.text < 200 then return end
+        local body = r.text
+        local rv = body:match("script_version%('([^']+)'") or body:match('script_version%("([^"]+)"')
+        if not rv or not verNewer(rv, thisScript().version) then return end
+        local f = io.open(thisScript().path, 'wb')
+        if not f then return end
+        f:write(body); f:close()
+        sampAddChatMessage('[CC] update -> v' .. rv .. ', reload...', 0x66CCFF)
+        wait(200)
+        thisScript():reload()
+    end, function() end)
+end
+
 --=========================================================
--- КОДИРОВКИ
+-- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 --=========================================================
 local function isValidUtf8(s)
     local i, n = 1, #s
@@ -354,7 +387,7 @@ local function toAnsi(s)
 end
 
 --=========================================================
--- СПРАВОЧНИК ПРЕДМЕТОВ
+-- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 --=========================================================
 local itemsIndex = {}
 local itemsUrl = 'https://raw.githubusercontent.com/FREYM1337/forumnick/main/ArzMarketV3/items.json'
@@ -367,7 +400,7 @@ local function loadItemsIndex()
             itemsIndex = data
             local c = 0
             for _ in pairs(itemsIndex) do c = c + 1 end
-            print('[CC] предметов в справочнике: ' .. c)
+            print('[CC] пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ: ' .. c)
         end
     end)
 end
@@ -378,7 +411,7 @@ local function itemNameById(id)
 end
 
 --=========================================================
--- ХЕЛПЕРЫ
+-- пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 --=========================================================
 local function formatMoney(a)
     a = tonumber(a) or 0
@@ -393,10 +426,10 @@ end
 
 local function agoText(ts)
     local d = os.time() - ts
-    if d < 60 then return u8('только что') end
-    if d < 3600 then return math.floor(d / 60) .. u8(' мин') end
-    if d < 86400 then return math.floor(d / 3600) .. u8(' ч') end
-    return math.floor(d / 86400) .. u8(' д')
+    if d < 60 then return u8('пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ') end
+    if d < 3600 then return math.floor(d / 60) .. u8(' пїЅпїЅпїЅ') end
+    if d < 86400 then return math.floor(d / 3600) .. u8(' пїЅ') end
+    return math.floor(d / 86400) .. u8(' пїЅ')
 end
 
 local itemIdFields = { 'id', 'itemId', 'item_id', 'item', 'model', 'modelId' }
@@ -454,8 +487,8 @@ local function extractEnch(item, shop, idx, side)
     return nil
 end
 
-local ruUp = u8('ЁАБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ')
-local ruLo = u8('ёабвгдежзийклмнопрстуфхцчшщъыьэюя')
+local ruUp = u8('пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ')
+local ruLo = u8('пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ')
 local ruMap = {}
 for i = 1, #ruUp, 2 do ruMap[ruUp:sub(i, i + 1)] = ruLo:sub(i, i + 1) end
 
@@ -465,7 +498,7 @@ local function lower(text)
 end
 
 --=========================================================
--- СЕРВЕРЫ
+-- пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 --=========================================================
 local arizonaServers = nil
 local serverNames = {}
@@ -477,7 +510,7 @@ local function serverName(n)
     n = tonumber(n) or 0
     if serverNames[n] then return serverNames[n] end
     if n == 201 then return 'Vice City' end
-    return u8('Сервер ') .. n
+    return u8('пїЅпїЅпїЅпїЅпїЅпїЅ ') .. n
 end
 
 local function buildServerNames()
@@ -501,7 +534,7 @@ local function getServerNumber()
     return 0
 end
 
--- Vice City числится как 201, но в запросе уходит как 0
+-- Vice City пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ 201, пїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ 0
 local function requestServerId(n)
     n = tonumber(n) or 0
     if n == 201 then return '0' end
@@ -516,7 +549,7 @@ local function serverMatches(sid, target)
 end
 
 --=========================================================
--- ХРАНИЛИЩЕ СДЕЛОК
+-- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
 --=========================================================
 -- trade = { ts, srv, id, ench, name, side, price, qty, shop, exact, sid }
 local trades = {}
@@ -618,11 +651,11 @@ local function loadTradesFromCsv()
 
     table.sort(trades, function(a, b) return a.ts < b.ts end)
     dataVersion = dataVersion + 1
-    print(('[CC] загружено сделок: %d (пропущено по нецелевым серверам: %d)'):format(loaded, skipped))
+    print(('[CC] пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ: %d (пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ: %d)'):format(loaded, skipped))
 end
 
 --=========================================================
--- ДЕТЕКТ СДЕЛОК ПО СРЕЗАМ
+-- пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
 --=========================================================
 local nameById = {}
 
@@ -664,7 +697,7 @@ local function detectTrades(srv, curLots, curItems)
 
     for shopId, lots in pairs(st.prevLots) do
         local cur = curLots[shopId]
-        -- лавка целиком пропала из выдачи: могла закрыться, а не распродаться
+        -- пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         if cur then
             local curItemSet = curItems[shopId] or {}
             for lotKey, prevCount in pairs(lots) do
@@ -675,7 +708,7 @@ local function detectTrades(srv, curLots, curItems)
                 else
                     local base = lotKey:match('^(.*)|%d+$')
                     if base and curItemSet[base] then
-                        sold = 0   -- переставили цену, а не продали
+                        sold = 0   -- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ, пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
                     else
                         sold = prevCount
                         exact = false
@@ -701,7 +734,7 @@ local function detectTrades(srv, curLots, curItems)
 end
 
 --=========================================================
--- ЗАПРОС К API
+-- пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ API
 --=========================================================
 local apiUrl = 'https://api.arz.market/api/getMarketplace/'
 local scriptVersion = '3.55'
@@ -716,7 +749,7 @@ local function doRefresh(srv)
     refreshAuthFromRegistry()
 
     if myServerId == '' or myToken == '' then
-        st.apiStatus = u8('нет авторизации')
+        st.apiStatus = u8('пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ')
         st.lastUpdate = os.clock()
         return
     end
@@ -740,13 +773,13 @@ local function doRefresh(srv)
         st.lastUpdate = os.clock()
 
         if response.status_code ~= 200 and response.status_code ~= 304 then
-            st.apiStatus = u8('код ') .. tostring(response.status_code)
+            st.apiStatus = u8('пїЅпїЅпїЅ ') .. tostring(response.status_code)
             st.errStreak = st.errStreak + 1
             return
         end
         local ok, data = pcall(decodeJson, response.text)
         if not ok or type(data) ~= 'table' then
-            st.apiStatus = u8('битый JSON')
+            st.apiStatus = u8('пїЅпїЅпїЅпїЅпїЅ JSON')
             st.errStreak = st.errStreak + 1
             return
         end
@@ -801,24 +834,24 @@ local function doRefresh(srv)
     end, function()
         updating = false
         st.lastUpdate = os.clock()
-        st.apiStatus = u8('нет связи')
+        st.apiStatus = u8('пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ')
         st.errStreak = st.errStreak + 1
     end)
 end
 
 --=========================================================
--- ОБЩАЯ БАЗА
--- Один запрос на все серверы сразу: продление аренды,
--- отправка накопленного и получение нового за один заход.
+-- пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ
+-- пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ,
+-- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ.
 --=========================================================
 local tickBusy = false
 local nextTickAt = 0
 local lastTickOk = 0
 local syncStatus = ''
 
-local PUSH_EVERY   = 180   -- сборщик: отправка накопленного + продление аренды
-local OPEN_EVERY   = 120   -- окно открыто: подтягиваем свежее
-local IDLE_EVERY   = 300   -- окно закрыто и мы не сборщик: только проверка аренды
+local PUSH_EVERY   = 180   -- пїЅпїЅпїЅпїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ + пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
+local OPEN_EVERY   = 120   -- пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
+local IDLE_EVERY   = 300   -- пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
 
 local function anyHolder()
     for _, n in ipairs(tracked) do
@@ -838,8 +871,8 @@ local function doTick()
     tickBusy = true
     nextTickAt = os.clock() + tickInterval()
 
-    -- читаем ленту, если окно открыто, либо если сами что-то отправляем:
-    -- иначе курсор нельзя двигать, можно перескочить чужие записи
+    -- пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅ-пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ:
+    -- пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
     local sending = {}
     local payload = { op = 'tick', client = clientId, servers = {} }
     if syncKey ~= '' then payload.key = syncKey end
@@ -873,7 +906,7 @@ local function doTick()
         end
         local ok, d = pcall(decodeJson, r.text)
         if not ok or type(d) ~= 'table' or not d.ok or type(d.servers) ~= 'table' then
-            syncStatus = u8('плохой ответ базы')
+            syncStatus = u8('пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ')
             return
         end
 
@@ -889,13 +922,13 @@ local function doTick()
                 st.isHolder = res.isHolder and true or false
                 st.leaseHolder = res.holder
                 if was and not st.isHolder then
-                    -- роль ушла: старый срез устарел, иначе на возврате
-                    -- разница даст пачку ложных сделок
+                    -- пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+                    -- пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
                     st.prevLots, st.prevItems = nil, nil
                     st.pushQueue = {}
                 end
 
-                -- сначала чужое из ленты
+                -- пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
                 if type(res.trades) == 'table' then
                     for j = 1, #res.trades do
                         local t = res.trades[j]
@@ -918,7 +951,7 @@ local function doTick()
                     end
                 end
 
-                -- затем своё, уже с присвоенными базой номерами
+                -- пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ, пїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
                 local added = tonumber(res.added) or 0
                 local firstId = tonumber(res.firstPushedId) or 0
                 if added > 0 and firstId > 0 then
@@ -933,7 +966,7 @@ local function doTick()
                         table.remove(st.pushQueue, 1)
                     end
                 elseif sending[n] and sending[n] > 0 then
-                    -- база не приняла: скорее всего аренду перехватили
+                    -- пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
                     st.pushQueue = {}
                 end
 
@@ -947,12 +980,12 @@ local function doTick()
         end
     end, function()
         tickBusy = false
-        syncStatus = u8('нет связи')
+        syncStatus = u8('пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ')
     end)
 end
 
 --=========================================================
--- ПЕРЕХВАТ ТОКЕНА
+-- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
 --=========================================================
 addEventHandler('onReceivePacket', function(packetId, bs)
     if packetId ~= 220 then return true end
@@ -995,7 +1028,7 @@ addEventHandler('onReceivePacket', function(packetId, bs)
 end)
 
 --=========================================================
--- СТАТИСТИКА
+-- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 --=========================================================
 local function periodCutoff()
     if periodFilter == 1 then return os.time() - 86400 end
@@ -1047,11 +1080,11 @@ local rowsQuery, rowsSide, rowsPeriod, rowsSort, rowsMin, rowsSrv = nil, -1, -1,
 local searchBuf = new.char[128]()
 
 local sortNames = {
-    [0] = u8('по времени'),
-    [1] = u8('по числу сделок'),
-    [2] = u8('по названию'),
-    [3] = u8('по цене'),
-    [4] = u8('по объёму')
+    [0] = u8('пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ'),
+    [1] = u8('пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ'),
+    [2] = u8('пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ'),
+    [3] = u8('пїЅпїЅ пїЅпїЅпїЅпїЅ'),
+    [4] = u8('пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ')
 }
 
 local function rebuildRows()
@@ -1107,7 +1140,7 @@ local function invalidateStats()
 end
 
 --=========================================================
--- КУРСОР
+-- пїЅпїЅпїЅпїЅпїЅпїЅ
 --=========================================================
 local CURSOR_MODE = 3
 local cursorActive = false
@@ -1138,7 +1171,7 @@ local function openWindow()
     windowOpen[0] = true
     setCursorMode(CURSOR_MODE, true)
     cursorActive = true
-    nextTickAt = 0   -- догоняем пропущенное сразу при открытии
+    nextTickAt = 0   -- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 end
 
 local function closeWindow()
@@ -1157,7 +1190,7 @@ addEventHandler('onScriptTerminate', function(scr)
 end)
 
 --=========================================================
--- ИНТЕРФЕЙС
+-- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 --=========================================================
 imgui.OnInitialize(function()
     imgui.GetIO().IniFilename = nil
@@ -1240,28 +1273,28 @@ local function detailPanel(stats)
     local rate = rateOf(stats.srv)
 
     imgui.TextWrapped(stats.name)
-    colored(GREY, serverName(stats.srv) .. u8('   валюта ') .. cur .. u8('   ID ') .. stats.id)
-    colored(GREY, u8('сделок: ') .. stats.count .. u8('   штук: ') .. formatMoney(stats.qty))
+    colored(GREY, serverName(stats.srv) .. u8('   пїЅпїЅпїЅпїЅпїЅпїЅ ') .. cur .. u8('   ID ') .. stats.id)
+    colored(GREY, u8('пїЅпїЅпїЅпїЅпїЅпїЅ: ') .. stats.count .. u8('   пїЅпїЅпїЅпїЅ: ') .. formatMoney(stats.qty))
 
     imgui.Separator()
-    imgui.Text(u8('медиана: ') .. formatMoney(stats.median) .. ' ' .. cur)
-    colored(GREY, u8('мин ') .. formatMoney(stats.min) .. u8('   макс ') .. formatMoney(stats.max))
+    imgui.Text(u8('пїЅпїЅпїЅпїЅпїЅпїЅпїЅ: ') .. formatMoney(stats.median) .. ' ' .. cur)
+    colored(GREY, u8('пїЅпїЅпїЅ ') .. formatMoney(stats.min) .. u8('   пїЅпїЅпїЅпїЅ ') .. formatMoney(stats.max))
     if rate and cur ~= currencyDefault then
         colored(CYAN, u8('~ ') .. formatMoney(stats.median * rate) .. ' ' .. currencyDefault
-            .. u8('  (курс из конфига)'))
+            .. u8('  (пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ)'))
     end
 
     local st = srvState[stats.srv]
     local best = st and st.currentBest[stats.id .. '#' .. stats.ench]
     if best then
         imgui.Separator()
-        colored(GREY, u8('сейчас на рынке'))
-        if best.buyMax then imgui.Text(u8('скуп до:  ') .. formatMoney(best.buyMax) .. ' ' .. cur) end
-        if best.sellMin then imgui.Text(u8('лавки от: ') .. formatMoney(best.sellMin) .. ' ' .. cur) end
+        colored(GREY, u8('пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ'))
+        if best.buyMax then imgui.Text(u8('пїЅпїЅпїЅпїЅ пїЅпїЅ:  ') .. formatMoney(best.buyMax) .. ' ' .. cur) end
+        if best.sellMin then imgui.Text(u8('пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ: ') .. formatMoney(best.sellMin) .. ' ' .. cur) end
     end
 
     imgui.Separator()
-    colored(GREY, u8('последние сделки'))
+    colored(GREY, u8('пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ'))
 
     local list = byKey[stats.key]
     local cutoff = periodCutoff()
@@ -1281,11 +1314,11 @@ local function detailPanel(stats)
         end
     end
     if shown == 0 then
-        colored(GREY, u8('нет сделок за период'))
+        colored(GREY, u8('пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ'))
     else
         imgui.Separator()
-        colored(GREY, u8('~ = лот исчез целиком,'))
-        colored(GREY, u8('мог быть снят, а не продан'))
+        colored(GREY, u8('~ = пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ,'))
+        colored(GREY, u8('пїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ, пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ'))
     end
 end
 
@@ -1299,7 +1332,7 @@ imgui.OnFrame(
         local resX, resY = getScreenResolution()
         imgui.SetNextWindowPos(imgui.ImVec2(cfg.posX[0] * resX, cfg.posY[0] * resY), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
         imgui.SetNextWindowSize(imgui.ImVec2(cfg.sizeX[0], cfg.sizeY[0]), imgui.Cond.FirstUseEver)
-        imgui.Begin(u8('CC — история сделок'), windowOpen)
+        imgui.Begin(u8('CC пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ'), windowOpen)
 
         local sz = imgui.GetWindowSize()
         if math.abs(sz.x - cfg.sizeX[0]) > 0.5 or math.abs(sz.y - cfg.sizeY[0]) > 0.5 then
@@ -1310,16 +1343,16 @@ imgui.OnFrame(
         cfg.posX[0] = (wp.x + sz.x * 0.5) / resX
         cfg.posY[0] = (wp.y + sz.y * 0.5) / resY
 
-        -- ряд 1: поиск, стороны, период, фильтр
+        -- пїЅпїЅпїЅ 1: пїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅ
         imgui.PushItemWidth(220)
         imgui.InputText('##search', searchBuf, ffi.sizeof(searchBuf))
         imgui.PopItemWidth()
         if imgui.IsItemHovered() then imgui.SetMouseCursor(imgui.MouseCursor.TextInput) end
         imgui.SameLine()
-        colored(GREY, u8('поиск'))
+        colored(GREY, u8('пїЅпїЅпїЅпїЅпїЅ'))
 
         imgui.SameLine(0, 18)
-        local sideLabels = { [0] = 'Все', [1] = 'Лавки', [2] = 'Скуп' }
+        local sideLabels = { [0] = 'пїЅпїЅпїЅ', [1] = 'пїЅпїЅпїЅпїЅпїЅ', [2] = 'пїЅпїЅпїЅпїЅ' }
         for i = 0, 2 do
             if i > 0 then imgui.SameLine(0, 4) end
             local active = (sideFilter == i)
@@ -1331,7 +1364,7 @@ imgui.OnFrame(
         end
 
         imgui.SameLine(0, 18)
-        local periodLabels = { [0] = 'Всё', [1] = '24ч', [2] = '7д' }
+        local periodLabels = { [0] = 'пїЅпїЅ', [1] = '24пїЅ', [2] = '7пїЅ' }
         for i = 0, 2 do
             if i > 0 then imgui.SameLine(0, 4) end
             local active = (periodFilter == i)
@@ -1350,15 +1383,15 @@ imgui.OnFrame(
         end
         imgui.PopItemWidth()
         imgui.SameLine()
-        colored(GREY, u8('мин. сделок'))
+        colored(GREY, u8('пїЅпїЅпїЅ. пїЅпїЅпїЅпїЅпїЅпїЅ'))
 
-        -- ряд 2: выбор сервера
-        colored(GREY, u8('сервер:'))
+        -- пїЅпїЅпїЅ 2: пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+        colored(GREY, u8('пїЅпїЅпїЅпїЅпїЅпїЅ:'))
         imgui.SameLine(0, 8)
         do
             local active = (serverFilter == 0)
             if active then imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.30, 0.45, 0.65, 1.00)) end
-            if imgui.Button(u8('Все') .. '##srvall', imgui.ImVec2(50, 0)) then
+            if imgui.Button(u8('пїЅпїЅпїЅ') .. '##srvall', imgui.ImVec2(50, 0)) then
                 serverFilter = 0; rowsVersion = -1; markDirty()
             end
             if active then imgui.PopStyleColor() end
@@ -1375,22 +1408,22 @@ imgui.OnFrame(
             if imgui.IsItemHovered() then
                 local st = srvState[n]
                 imgui.BeginTooltip()
-                imgui.Text(serverName(n) .. u8('  (номер ') .. n .. ')')
-                imgui.Text(u8('валюта: ') .. currencyOf(n))
-                imgui.Text(u8('срезов: ') .. st.snapshots)
+                imgui.Text(serverName(n) .. u8('  (пїЅпїЅпїЅпїЅпїЅ ') .. n .. ')')
+                imgui.Text(u8('пїЅпїЅпїЅпїЅпїЅпїЅ: ') .. currencyOf(n))
+                imgui.Text(u8('пїЅпїЅпїЅпїЅпїЅпїЅ: ') .. st.snapshots)
                 if st.lastOkTs then
-                    imgui.Text(u8('последний срез: ') .. agoText(st.lastOkTs))
+                    imgui.Text(u8('пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ: ') .. agoText(st.lastOkTs))
                 else
-                    imgui.Text(u8('срезов пока не было'))
+                    imgui.Text(u8('пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅ'))
                 end
                 if st.apiStatus ~= '' then
-                    imgui.Text(u8('рынок: ') .. st.apiStatus)
+                    imgui.Text(u8('пїЅпїЅпїЅпїЅпїЅ: ') .. st.apiStatus)
                 end
                 if syncActive then
                     if st.isHolder then
-                        imgui.Text(u8('база: собираю я'))
+                        imgui.Text(u8('пїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ'))
                     else
-                        imgui.Text(u8('база: собирает ') .. tostring(st.leaseHolder or '?'))
+                        imgui.Text(u8('пїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ ') .. tostring(st.leaseHolder or '?'))
                     end
                 end
                 imgui.EndTooltip()
@@ -1398,32 +1431,32 @@ imgui.OnFrame(
         end
 
         imgui.SameLine(0, 18)
-        if imgui.Button(u8('Обновить все')) then
+        if imgui.Button(u8('пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ')) then
             for _, n in ipairs(tracked) do srvState[n].lastUpdate = 0 end
         end
 
-        -- статус
+        -- пїЅпїЅпїЅпїЅпїЅпїЅ
         rebuildRows()
-        local status = ('позиций: %d  |  сделок: %d  |  срезов: %d  |  сортировка: ')
+        local status = ('пїЅпїЅпїЅпїЅпїЅпїЅпїЅ: %d  |  пїЅпїЅпїЅпїЅпїЅпїЅ: %d  |  пїЅпїЅпїЅпїЅпїЅпїЅ: %d  |  пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ: ')
             :format(#rowsCache, #trades, totalSnapshots)
         colored(GREY, u8(status) .. (sortNames[sortMode] or ''))
         imgui.SameLine()
         if updating then
-            colored(CYAN, u8('обновление...'))
+            colored(CYAN, u8('пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ...'))
         elseif not syncActive then
-            colored(GREY, u8('общая база: выкл'))
+            colored(GREY, u8('пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅ'))
         elseif syncStatus ~= '' then
-            colored(ORANGE, u8('общая база: ') .. syncStatus)
+            colored(ORANGE, u8('пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ: ') .. syncStatus)
         else
             local mine = 0
             for _, n in ipairs(tracked) do
                 if srvState[n].isHolder then mine = mine + 1 end
             end
             colored(mine > 0 and GREEN or CYAN,
-                u8('общая база: собираю ') .. mine .. u8(' из ') .. #tracked)
+                u8('пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅпїЅпїЅ ') .. mine .. u8(' пїЅпїЅ ') .. #tracked)
         end
 
-        -- дыра в сборе видна сразу: восстановить пропущенное неоткуда
+        -- пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         do
             local stale = nil
             for _, n in ipairs(tracked) do
@@ -1435,13 +1468,13 @@ imgui.OnFrame(
             end
             if stale then
                 imgui.SameLine(0, 15)
-                colored(ORANGE, u8('! ') .. stale.name .. u8(': нет срезов ') .. agoText(os.time() - stale.age))
+                colored(ORANGE, u8('! ') .. stale.name .. u8(': пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ ') .. agoText(os.time() - stale.age))
             end
         end
 
         imgui.Separator()
 
-        -- цены в разных валютах в одном списке напрямую не сравниваются
+        -- пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         if serverFilter == 0 then
             local seen, mixed = nil, false
             for _, n in ipairs(tracked) do
@@ -1450,10 +1483,10 @@ imgui.OnFrame(
             end
             if mixed then
                 if sortMode == 3 then
-                    colored(ORANGE, u8('Внимание: в списке разные валюты, а сортировка идёт по цене — ')
-                        .. u8('числа сравниваются напрямую. Выбери конкретный сервер.'))
+                    colored(ORANGE, u8('пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ: пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ, пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ ')
+                        .. u8('пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ. пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ.'))
                 else
-                    colored(GREY, u8('В списке серверы с разной валютой, цены между ними не сопоставимы.'))
+                    colored(GREY, u8('пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.'))
                 end
             end
         end
@@ -1473,16 +1506,16 @@ imgui.OnFrame(
         COL_NAME = style.WindowPadding.x
         NAME_WIDTH = COL_SRV - COL_NAME - 15
 
-        headerCell(COL_NAME, 'Предмет', 2)
-        imgui.SameLine(); headerCell(COL_SRV, 'Сервер', 2)
-        imgui.SameLine(); headerCell(COL_WHERE, 'Где', 2)
-        imgui.SameLine(); headerCell(COL_LAST, 'Последняя', 0)
-        imgui.SameLine(); headerCell(COL_MIN, 'Мин', 3)
-        imgui.SameLine(); headerCell(COL_MED, 'Медиана', 3)
-        imgui.SameLine(); headerCell(COL_MAX, 'Макс', 3)
-        imgui.SameLine(); headerCell(COL_CNT, 'Сделок', 1)
-        imgui.SameLine(); headerCell(COL_QTY, 'Штук', 4)
-        imgui.SameLine(); headerCell(COL_WHEN, 'Когда', 0)
+        headerCell(COL_NAME, 'пїЅпїЅпїЅпїЅпїЅпїЅпїЅ', 2)
+        imgui.SameLine(); headerCell(COL_SRV, 'пїЅпїЅпїЅпїЅпїЅпїЅ', 2)
+        imgui.SameLine(); headerCell(COL_WHERE, 'пїЅпїЅпїЅ', 2)
+        imgui.SameLine(); headerCell(COL_LAST, 'пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ', 0)
+        imgui.SameLine(); headerCell(COL_MIN, 'пїЅпїЅпїЅ', 3)
+        imgui.SameLine(); headerCell(COL_MED, 'пїЅпїЅпїЅпїЅпїЅпїЅпїЅ', 3)
+        imgui.SameLine(); headerCell(COL_MAX, 'пїЅпїЅпїЅпїЅ', 3)
+        imgui.SameLine(); headerCell(COL_CNT, 'пїЅпїЅпїЅпїЅпїЅпїЅ', 1)
+        imgui.SameLine(); headerCell(COL_QTY, 'пїЅпїЅпїЅпїЅ', 4)
+        imgui.SameLine(); headerCell(COL_WHEN, 'пїЅпїЅпїЅпїЅпїЅ', 0)
         imgui.Separator()
 
         for i = 1, #rowsCache do
@@ -1504,7 +1537,7 @@ imgui.OnFrame(
             colored(GREY, fitText(serverName(row.srv), 90, 's' .. row.srv))
 
             imgui.SetCursorPosY(y); imgui.SetCursorPosX(COL_WHERE)
-            colored(GREY, row.side == 'sell' and u8('лавка') or u8('скуп'))
+            colored(GREY, row.side == 'sell' and u8('пїЅпїЅпїЅпїЅпїЅ') or u8('пїЅпїЅпїЅпїЅ'))
 
             imgui.SetCursorPosY(y); imgui.SetCursorPosX(COL_LAST)
             colored(WHITE, formatMoney(row.last))
@@ -1529,9 +1562,9 @@ imgui.OnFrame(
         end
 
         if #rowsCache == 0 then
-            colored(GREY, u8('Сделок пока нет.'))
-            colored(GREY, u8('Первая появится после второго среза рынка,'))
-            colored(GREY, u8('дальше история будет копиться сама.'))
+            colored(GREY, u8('пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅ.'))
+            colored(GREY, u8('пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ,'))
+            colored(GREY, u8('пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ.'))
         end
         imgui.EndChild()
 
@@ -1547,9 +1580,9 @@ imgui.OnFrame(
             if sel then
                 detailPanel(sel)
             else
-                colored(GREY, u8('Кликни по строке,'))
-                colored(GREY, u8('чтобы увидеть все'))
-                colored(GREY, u8('сделки по предмету.'))
+                colored(GREY, u8('пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ,'))
+                colored(GREY, u8('пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ'))
+                colored(GREY, u8('пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.'))
             end
             imgui.EndChild()
         end
@@ -1563,6 +1596,8 @@ imgui.OnFrame(
 --=========================================================
 function main()
     while not isSampAvailable() do wait(0) end
+
+    checkUpdate()
 
     loadItemsIndex()
 
@@ -1582,32 +1617,32 @@ function main()
 
     sampRegisterChatCommand('ccreload', function()
         loadItemsIndex()
-        sampAddChatMessage('[CC] справочник предметов перезагружен', 0x66CCFF)
+        sampAddChatMessage('[CC] пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ', 0x66CCFF)
     end)
 
     sampRegisterChatCommand('ccpath', function()
-        sampAddChatMessage('[CC] история: ' .. csvPath, 0x66CCFF)
+        sampAddChatMessage('[CC] пїЅпїЅпїЅпїЅпїЅпїЅпїЅ: ' .. csvPath, 0x66CCFF)
     end)
 
     sampRegisterChatCommand('ccadd', function(arg)
         local n = tonumber(arg)
         if not n or n <= 0 then
-            sampAddChatMessage('[CC] укажи номер сервера, например: /ccadd 201', 0xFF9955)
+            sampAddChatMessage('[CC] пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ: /ccadd 201', 0xFF9955)
             return
         end
         if trackedSet[n] then
-            sampAddChatMessage('[CC] этот сервер уже отслеживается', 0xFF9955)
+            sampAddChatMessage('[CC] пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ', 0xFF9955)
             return
         end
         addServer(n)
         markDirty()
-        sampAddChatMessage('[CC] добавлен сервер ' .. n, 0x66CCFF)
+        sampAddChatMessage('[CC] пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ ' .. n, 0x66CCFF)
     end)
 
     sampRegisterChatCommand('cclist', function()
         for _, n in ipairs(tracked) do
             local st = srvState[n]
-            sampAddChatMessage(('[CC] %d - срезов %d %s'):format(
+            sampAddChatMessage(('[CC] %d - пїЅпїЅпїЅпїЅпїЅпїЅ %d %s'):format(
                 n, st.snapshots, st.apiStatus ~= '' and ('(' .. toAnsi(st.apiStatus) .. ')') or ''), 0x66CCFF)
         end
     end)
@@ -1625,7 +1660,7 @@ function main()
     loadTradesFromCsv()
     markDirty()
 
-    sampAddChatMessage(('[CC] сбор запущен, серверов: %d. Окно: /cc'):format(#tracked), 0x66CCFF)
+    sampAddChatMessage(('[CC] пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ: %d. пїЅпїЅпїЅпїЅ: /cc'):format(#tracked), 0x66CCFF)
 
     local VK_ESCAPE = 0x1B
     local escWasDown = false
@@ -1645,16 +1680,16 @@ function main()
             doTick()
         end
 
-        -- по кругу обходим серверы, чтобы не бить все запросы разом
+        -- пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
         if #tracked > 0 then
             rr = rr + 1
             if rr > #tracked then rr = 1 end
             local n = tracked[rr]
             local st = srvState[n]
 
-            -- рынок опрашивает только держатель аренды
+            -- пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
             local mayPoll = (not syncActive) or st.isHolder
-            -- после ошибок увеличиваем паузу, чтобы не долбить API
+            -- пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ API
             local interval = cfg.refresh[0] * math.min(8, 1 + st.errStreak)
 
             if mayPoll and not updating and os.clock() - st.lastUpdate > interval then
