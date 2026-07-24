@@ -1,6 +1,6 @@
 script_name('CC Market History')
 script_description('Istoriya realnyh sdelok na rynke, neskolko serverov')
-script_version('4.4')
+script_version('4.5')
 
 local ffi = require('ffi')
 local imgui = require('mimgui')
@@ -87,6 +87,7 @@ end
 local syncActive = syncEnabled and syncUrl ~= ''
 local windowOpen = new.bool(false)
         local autoFocusTrade = new.bool(toBool(cfgData.main.autoFocus, true))
+        local showTradePrice = new.bool(toBool(cfgData.main.showPrice, true))
 
 --=========================================================
 -- ¬¿Àﬁ“€
@@ -194,6 +195,7 @@ local function saveCfg()
     cfgData.main.serverFilter = serverFilter
     cfgData.main.resale = resaleMode and 1 or 0
         cfgData.main.autoFocus = autoFocusTrade[0] and 1 or 0
+        cfgData.main.showPrice = showTradePrice[0] and 1 or 0
     cfgData.window.sizeX = cfg.sizeX[0]
     cfgData.window.sizeY = cfg.sizeY[0]
     cfgData.window.posX = cfg.posX[0]
@@ -1666,6 +1668,7 @@ imgui.OnFrame(
             end
         end
         imgui.SameLine(0, 18); if imgui.Checkbox('Auto-focus trade', autoFocusTrade) then markDirty() end
+        imgui.SameLine(0, 12); if imgui.Checkbox('Show prices', showTradePrice) then markDirty() end
 
         -- ÒÚ‡ÚÛÒ
         if resaleMode then rebuildResaleRows() else rebuildRows() end
@@ -2103,7 +2106,7 @@ do
     end
 
     imgui.OnFrame(
-        function() return tradeOpen end,
+        function() return tradeOpen and showTradePrice[0] end,
         function()
             local items = tradeItems()
             if #items == 0 then return end
