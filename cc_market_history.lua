@@ -1,6 +1,6 @@
 script_name('CC Market History')
 script_description('Istoriya realnyh sdelok na rynke, neskolko serverov')
-script_version('3.7')
+script_version('3.8')
 
 local ffi = require('ffi')
 local imgui = require('mimgui')
