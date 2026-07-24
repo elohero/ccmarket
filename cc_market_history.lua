@@ -1,6 +1,6 @@
 script_name('CC Market History')
 script_description('Istoriya realnyh sdelok na rynke, neskolko serverov')
-script_version('4.2')
+script_version('4.3')
 
 local ffi = require('ffi')
 local imgui = require('mimgui')
@@ -1957,6 +1957,30 @@ do
     local tradeOpen = false
     local tradeGrids = {}   -- inventory type -> { slot -> { id=string, ench=number } }
 
+    -- bring the game window forward when a trade opens while alt-tabbed
+    pcall(ffi.cdef, [[
+        typedef void* HWND;
+        HWND FindWindowA(const char* c, const char* w);
+        int ShowWindow(HWND h, int cmd);
+        int SetForegroundWindow(HWND h);
+        void* GetForegroundWindow(void);
+        int IsIconic(HWND h);
+        int BringWindowToTop(HWND h);
+    ]])
+    local gtaWnd = nil
+    local function focusGame()
+        pcall(function()
+            if gtaWnd == nil then
+                gtaWnd = ffi.C.FindWindowA('Grand theft auto San Andreas', nil)
+            end
+            if gtaWnd == nil then return end
+            if ffi.C.GetForegroundWindow() == gtaWnd then return end
+            if ffi.C.IsIconic(gtaWnd) ~= 0 then ffi.C.ShowWindow(gtaWnd, 9) end -- SW_RESTORE
+            ffi.C.BringWindowToTop(gtaWnd)
+            ffi.C.SetForegroundWindow(gtaWnd)
+        end)
+    end
+
     local tradeDbg = false
     local dbgPath = getWorkingDirectory() .. '/config/cc_trade_debug.log'
     local function dlog(dir, text)
@@ -2002,8 +2026,10 @@ do
                 tradeGrids = {}
             end
         elseif name == 'event.inventory.setTradeVisible' then
-            tradeOpen = (arg ~= nil) and (arg:find('true', 1, true) ~= nil)
+            local opened = (arg ~= nil) and (arg:find('true', 1, true) ~= nil)
+            tradeOpen = opened
             tradeGrids = {}
+            if opened then focusGame() end
         elseif name == 'event.inventory.playerInventory' and tradeOpen and arg then
             local ok, data = pcall(decodeJson, arg)
             if not ok or type(data) ~= 'table' then return end
