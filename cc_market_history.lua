@@ -1,6 +1,6 @@
 script_name('CC Market History')
 script_description('Istoriya realnyh sdelok na rynke, neskolko serverov')
-script_version('3.8')
+script_version('3.9')
 
 local ffi = require('ffi')
 local imgui = require('mimgui')
@@ -1946,7 +1946,7 @@ end
 --=========================================================
 do
     local tradeDbg = false
-    local dbgPath = getWorkingDirectory() .. '\config\cc_trade_debug.log'
+    local dbgPath = getWorkingDirectory() .. "/config/cc_trade_debug.log"
 
     local function dlog(dir, text)
         local f = io.open(dbgPath, 'a')
